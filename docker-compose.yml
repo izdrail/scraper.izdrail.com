@@ -1,0 +1,11 @@
+services:
+  scraper.izdrail.com:
+    build:
+      context: .
+    container_name: scraper.izdrail.com
+    image: izdrail/scraper.izdrail.com:latest
+    restart: always
+    ports:
+      - "3366:3366"
+    volumes:
+      - .:/home/scraper/

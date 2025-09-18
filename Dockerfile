@@ -1,48 +1,65 @@
+# ---------------------------
 # Base image
+# ---------------------------
 FROM ubuntu:latest
-#FROM ubuntu:latest
-LABEL maintainer="Bogdanel Stefan  <stefan@izdrail.com>"
+LABEL maintainer="Bogdanel Stefan <stefan@izdrail.com>"
 
-# Install dependencies
+# ---------------------------
+# Install system dependencies
+# ---------------------------
 RUN apt update && apt install -y \
     curl \
     nodejs \
     npm \
     python3 \
     python3-pip \
+    python3-venv \
     net-tools \
     software-properties-common \
     openjdk-17-jdk \
     maven \
-    && apt-get clean
-
-# Install pip packages and supervisord
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install supervisor pipx
-
-LABEL maintainer="Bogdanel Stefan <stefan@izdrail.com>"
-
-# 📁 Working dir
-WORKDIR /home/skraper
-
-# 📦 System dependencies
-RUN apt-get update && apt-get install -y \
     git \
-    maven \
+    wget \
     && apt-get clean
 
-# ⬇️ Clone Skraper
+# ---------------------------
+# Setup Python Virtual Environment
+# ---------------------------
+RUN python3 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/venv/bin/pip install supervisor pipx
+
+# Use venv as default
+ENV PATH="/opt/venv/bin:$PATH"
+
+# ---------------------------
+# Working directory
+# ---------------------------
+WORKDIR /home/scraper
+
+# ---------------------------
+# Clone Skraper source
+# ---------------------------
 RUN git clone https://github.com/laravelcompany/skraper.git .
 
-# 🛠️ Build CLI + VAST API
+# ---------------------------
+# Build CLI + VAST API
+# ---------------------------
 RUN ./mvnw clean package -DskipTests=true
 
-# 📁 Move built jar to a usable path
+
+
+# ---------------------------
+# Move built jar to usable path
+# ---------------------------
 RUN mkdir -p /usr/local/skraper \
-    && cp /home/skraper/cli/target/cli.jar /usr/local/skraper/skraper.jar
+    && cp /home/scraper/cli/target/cli.jar /usr/local/skraper/skraper.jar
 
+RUN chmod +x /usr/local/skraper/skraper.jar
 
-# Customize shell with Zsh
+# ---------------------------
+# Fancy Zsh shell (optional)
+# ---------------------------
 RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v1.1.5/zsh-in-docker.sh)" -- \
     -t https://github.com/denysdovhan/spaceship-prompt \
     -a 'SPACESHIP_PROMPT_ADD_NEWLINE="false"' \
@@ -52,16 +69,28 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
     -p https://github.com/zsh-users/zsh-autosuggestions \
     -p https://github.com/zsh-users/zsh-completions
 
-# Copy Requirements
+# ---------------------------
+# Install Python requirements
+# ---------------------------
 COPY ./requirements.txt /home/skraper/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /home/osint/requirements.txt \
+
+RUN pip install --no-cache-dir --upgrade -r /home/skraper/requirements.txt \
     && pip install text2emotion pymupdf4llm sqlalchemy yake fastapi_versioning tls_client uvicorn gnews \
     && python3 -m nltk.downloader -d /usr/local/share/nltk_data wordnet punkt stopwords vader_lexicon \
     && python3 -m spacy download en_core_web_md \
     && python3 -m textblob.download_corpora
 
-
-
-# 🌐 Expose default VAST API port
+# ---------------------------
+# Expose default VAST API port
+# ---------------------------
 EXPOSE 3366
 
+# Supervisord configuration
+COPY docker/supervisord.conf /etc/supervisord.conf
+
+# Copy application
+
+COPY . .
+
+# Run application
+ENTRYPOINT ["supervisord", "-c", "/etc/supervisord.conf", "-n"]

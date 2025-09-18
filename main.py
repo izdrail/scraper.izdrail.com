@@ -4,15 +4,9 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.endpoints import feeds
-from api.endpoints import google
-from api.endpoints import seo
-from api.endpoints import videos
-from api.endpoints import testing
+
 from api.endpoints import scrapper
-from api.endpoints import jobs
-from api.endpoints import nlp as nlp_endpoint
-from api.endpoints import security
+
 
 app = FastAPI(
     title="Scrapper API",

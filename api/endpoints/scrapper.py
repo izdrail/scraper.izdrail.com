@@ -23,8 +23,8 @@ except OSError:
 router = APIRouter(prefix="/api/v1", tags=["scrapper"])
 
 # Configuration constants
-SKRAPER_PATH = Path('/usr/local/bin/skraper')
-ALLOWED_NETWORKS = {'twitter', 'reddit', 'instagram'}
+SKRAPER_PATH = Path('/usr/local/skraper/skraper.jar')
+ALLOWED_NETWORKS = {'twitter', 'reddit', 'instagram', 'twitch', 'pinterest'}
 
 class ScrapperAction(BaseModel):
     network: str
