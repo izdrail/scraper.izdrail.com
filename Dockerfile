@@ -74,7 +74,7 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 # ---------------------------
 COPY ./requirements.txt /home/scraper/requirements.txt
 
-RUN pip install --no-cache-dir --upgrade -r /home/skraper/requirements.txt \
+RUN pip install --no-cache-dir --upgrade -r /home/scraper/requirements.txt \
     && pip install text2emotion pymupdf4llm sqlalchemy yake fastapi_versioning tls_client uvicorn gnews \
     && python3 -m nltk.downloader -d /usr/local/share/nltk_data wordnet punkt stopwords vader_lexicon \
     && python3 -m spacy download en_core_web_md \
