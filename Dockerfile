@@ -72,7 +72,7 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 # ---------------------------
 # Install Python requirements
 # ---------------------------
-COPY ./requirements.txt /home/skraper/requirements.txt
+COPY ./requirements.txt /home/scraper/requirements.txt
 
 RUN pip install --no-cache-dir --upgrade -r /home/skraper/requirements.txt \
     && pip install text2emotion pymupdf4llm sqlalchemy yake fastapi_versioning tls_client uvicorn gnews \
