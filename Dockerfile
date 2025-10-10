@@ -35,27 +35,25 @@ ENV PATH="/opt/venv/bin:$PATH"
 # ---------------------------
 # Working directory
 # ---------------------------
-WORKDIR /home/scraper
+WORKDIR /home/skraper
 
 # ---------------------------
-# Clone Skraper source
+# Clone Skraper source from correct repo
 # ---------------------------
-RUN git clone https://github.com/laravelcompany/skraper.git .
+RUN git clone https://github.com/sokomishalov/skraper.git .
 
 # ---------------------------
-# Build CLI + VAST API
+# Build CLI jar
 # ---------------------------
-RUN ./mvnw clean package -DskipTests=true
-
-
+RUN ./mvnw clean package -DskipTests=true \
+    && mkdir -p /usr/local/skraper \
+    && cp /home/skraper/cli/target/cli.jar /usr/local/skraper/
 
 # ---------------------------
-# Move built jar to usable path
+# Create skraper executable wrapper
 # ---------------------------
-RUN mkdir -p /usr/local/skraper \
-    && cp /home/scraper/cli/target/cli.jar /usr/local/skraper/skraper.jar
-
-RUN chmod +x /usr/local/skraper/skraper.jar
+RUN echo '#!/bin/bash\njava -jar /usr/local/skraper/cli.jar "$@"' > /usr/local/bin/skraper \
+    && chmod +x /usr/local/bin/skraper
 
 # ---------------------------
 # Fancy Zsh shell (optional)
@@ -68,6 +66,11 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
     -p ssh-agent \
     -p https://github.com/zsh-users/zsh-autosuggestions \
     -p https://github.com/zsh-users/zsh-completions
+
+# ---------------------------
+# Switch to app working directory
+# ---------------------------
+WORKDIR /home/scraper
 
 # ---------------------------
 # Install Python requirements
@@ -89,7 +92,6 @@ EXPOSE 3366
 COPY docker/supervisord.conf /etc/supervisord.conf
 
 # Copy application
-
 COPY . .
 
 # Run application
