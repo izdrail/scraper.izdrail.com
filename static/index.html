@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meme Scraper</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .search-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            color: white;
+        }
+        .meme-card {
+            border: none;
+            border-radius: 15px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .meme-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+        .meme-media {
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            cursor: pointer;
+        }
+        .stats-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin: 3px;
+        }
+        .sentiment-positive { background: #d4edda; color: #155724; }
+        .sentiment-negative { background: #f8d7da; color: #721c24; }
+        .sentiment-neutral { background: #d1ecf1; color: #0c5460; }
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        .modal-dialog-centered {
+            max-width: 90%;
+        }
+        .preview-media {
+            max-width: 100%;
+            max-height: 80vh;
+        }
+        .api-link {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .keyword-badge {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            margin: 2px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="main-container">
+        <h1 class="text-center mb-4">
+            <i class="fas fa-images"></i> Meme Scraper
+        </h1>
+
+        <div class="search-section">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Network</label>
+                    <select class="form-select" id="networkSelect">
+                        <option value="9gag" selected>9GAG</option>
+                        <option value="reddit">Reddit</option>
+                        <option value="twitter">Twitter</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Search Query</label>
+                    <input type="text" class="form-control" id="queryInput" placeholder="Enter search term (e.g., meme, funny)" value="meme">
+                </div>
+                <div class="col-12">
+                    <button class="btn btn-light btn-lg w-100" onclick="searchMemes()">
+                        <i class="fas fa-search"></i> Search Memes
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Scraping memes...</p>
+        </div>
+
+        <div id="resultsContainer" class="row"></div>
+    </div>
+</div>
+
+<a href="/docs" class="api-link">
+    <button class="btn btn-primary btn-lg">
+        <i class="fas fa-code"></i> API Docs
+    </button>
+</a>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="previewTitle">Meme Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center" id="previewBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="downloadCurrentMeme()">
+                    <i class="fas fa-download"></i> Download
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let currentMemeUrl = '';
+    let currentMemeId = '';
+    let allMemes = [];
+
+    async function searchMemes() {
+        const network = document.getElementById('networkSelect').value;
+        const query = document.getElementById('queryInput').value;
+
+        if (!query) {
+            alert('Please enter a search query');
+            return;
+        }
+
+        document.getElementById('loadingSpinner').style.display = 'block';
+        document.getElementById('resultsContainer').innerHTML = '';
+
+        try {
+            // Correct API path based on your router
+            const apiPath = '/api/v1/run/scrapper';
+
+            console.log('Calling API:', apiPath);
+
+            const response = await fetch(apiPath, {
+                method: 'POST',
+                headers: {
+                    'accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    network: network,
+                    query: query
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            allMemes = data.scraped_data.items;
+            displayMemes(allMemes);
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('resultsContainer').innerHTML =
+                `<div class="col-12"><div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> Error fetching memes: ${error.message}
+                        <br><small>Check console for details or try again.</small>
+                    </div></div>`;
+        } finally {
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+    }
+
+    function displayMemes(memes) {
+        const container = document.getElementById('resultsContainer');
+        container.innerHTML = '';
+
+        if (!memes || memes.length === 0) {
+            container.innerHTML = '<div class="col-12"><div class="alert alert-info"><i class="fas fa-info-circle"></i> No memes found.</div></div>';
+            return;
+        }
+
+        memes.forEach((item, index) => {
+            const meme = item.original_item;
+            const sentiment = item.sentiment;
+            const sentimentClass = sentiment > 0 ? 'sentiment-positive' : sentiment < 0 ? 'sentiment-negative' : 'sentiment-neutral';
+            const sentimentText = sentiment > 0 ? 'Positive' : sentiment < 0 ? 'Negative' : 'Neutral';
+
+            const media = meme.media[0];
+            const isVideo = media.url.includes('.mp4');
+
+            // Generate keywords HTML
+            const keywordsHtml = item.keywords && item.keywords.length > 0
+                ? item.keywords.map(kw => `<span class="keyword-badge">${kw}</span>`).join('')
+                : '';
+
+            const card = document.createElement('div');
+            card.className = 'col-md-6 col-lg-4';
+            card.innerHTML = `
+                    <div class="card meme-card">
+                        <div onclick="previewMeme('${media.url}', '${meme.id}', \`${meme.text.replace(/`/g, '\\`')}\`, ${isVideo})">
+                            ${isVideo ?
+                `<video class="meme-media" muted loop playsinline><source src="${media.url}" type="video/mp4"></video>` :
+                `<img src="${media.url}" class="meme-media" alt="${meme.text.replace(/"/g, '&quot;')}">`
+            }
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text"><strong>${meme.text}</strong></p>
+                            <div class="mb-2">
+                                <span class="stats-badge ${sentimentClass}">
+                                    <i class="fas fa-smile"></i> ${sentimentText}
+                                </span>
+                                <span class="stats-badge bg-light">
+                                    <i class="fas fa-heart text-danger"></i> ${meme.statistics.likes.toLocaleString()}
+                                </span>
+                                <span class="stats-badge bg-light">
+                                    <i class="fas fa-comment text-primary"></i> ${meme.statistics.comments.toLocaleString()}
+                                </span>
+                            </div>
+                            ${keywordsHtml ? `<div class="mb-2">${keywordsHtml}</div>` : ''}
+                            <small class="text-muted d-block mb-2">
+                                <i class="fas fa-clock"></i> ${new Date(meme.publishedAt * 1000).toLocaleString()}
+                            </small>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-primary flex-fill" onclick="downloadMeme('${media.url}', '${meme.id}')">
+                                    <i class="fas fa-download"></i> Download
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="previewMeme('${media.url}', '${meme.id}', \`${meme.text.replace(/`/g, '\\`')}\`, ${isVideo})">
+                                    <i class="fas fa-eye"></i> Preview
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            container.appendChild(card);
+        });
+
+        // Auto-play videos on hover
+        document.querySelectorAll('video.meme-media').forEach(video => {
+            video.addEventListener('mouseenter', () => video.play());
+            video.addEventListener('mouseleave', () => video.pause());
+        });
+    }
+
+    function previewMeme(url, id, text, isVideo) {
+        currentMemeUrl = url;
+        currentMemeId = id;
+
+        const previewBody = document.getElementById('previewBody');
+        const previewTitle = document.getElementById('previewTitle');
+
+        previewTitle.textContent = text;
+
+        if (isVideo) {
+            previewBody.innerHTML = `
+                    <video class="preview-media" controls autoplay loop>
+                        <source src="${url}" type="video/mp4">
+                    </video>
+                `;
+        } else {
+            previewBody.innerHTML = `<img src="${url}" class="preview-media" alt="${text.replace(/"/g, '&quot;')}">`;
+        }
+
+        new bootstrap.Modal(document.getElementById('previewModal')).show();
+    }
+
+    function downloadMeme(url, id) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `meme_${id}${url.includes('.mp4') ? '.mp4' : '.jpg'}`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function downloadCurrentMeme() {
+        downloadMeme(currentMemeUrl, currentMemeId);
+    }
+
+    // Allow Enter key to trigger search
+    document.getElementById('queryInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchMemes();
+        }
+    });
+</script>
+</body>
+</html>
