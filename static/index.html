@@ -93,15 +93,16 @@
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label">Network</label>
-                    <select class="form-select" id="networkSelect">
-                        <option value="9gag" selected>9GAG</option>
-                        <option value="reddit">Reddit</option>
-                        <option value="twitter">Twitter</option>
+                    <select class="form-select" id="networkSelect" onchange="updatePathPlaceholder()">
+                        <option value="">Loading networks...</option>
                     </select>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">Search Query</label>
-                    <input type="text" class="form-control" id="queryInput" placeholder="Enter search term (e.g., meme, funny)" value="meme">
+                    <label class="form-label">Path/Query</label>
+                    <input type="text" class="form-control" id="queryInput" placeholder="e.g., /hot" value="/hot">
+                    <small class="text-white-50 d-block mt-1" id="pathHelp">
+                        <i class="fas fa-info-circle"></i> <span id="pathExample">Enter the path (e.g., /hot)</span>
+                    </small>
                 </div>
                 <div class="col-12">
                     <button class="btn btn-light btn-lg w-100" onclick="searchMemes()">
@@ -152,6 +153,91 @@
     let currentMemeUrl = '';
     let currentMemeId = '';
     let allMemes = [];
+    let networksData = null;
+
+    // Example paths for each network
+    const networkExamples = {
+        '9gag': '/hot',
+        'reddit': '/r/memes',
+        'instagram': '/explore/tags/memes',
+        'twitter': '/memes',
+        'facebook': '/memes',
+        'youtube': '/user/JetBrainsTV/videos',
+        'tiktok': '/tag/funny',
+        'telegram': '/channel_name',
+        'twitch': '/directory/game/Just%20Chatting',
+        'pinterest': '/levato/meme',
+        'flickr': '/photos/harrythehawk',
+        'tumblr': '/tagged/memes',
+        'vimeo': '/channels/staffpicks',
+        'ifunny': '/collective',
+        'vk': '/memes',
+        'pikabu': '/hot',
+        'coub': '/hot',
+        'odnoklassniki': '/group/12345678'
+    };
+
+    // Update path placeholder based on selected network
+    function updatePathPlaceholder() {
+        const network = document.getElementById('networkSelect').value;
+        const pathInput = document.getElementById('queryInput');
+        const pathExample = document.getElementById('pathExample');
+
+        if (network && networkExamples[network]) {
+            const example = networkExamples[network];
+            pathInput.placeholder = example;
+            pathExample.textContent = `Example for ${network}: ${example}`;
+        }
+    }
+
+    // Load networks on page load
+    async function loadNetworks() {
+        try {
+            console.log('Fetching networks...');
+            const response = await fetch('/api/v1/scrapper/networks');
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Networks loaded:', data);
+            networksData = data;
+
+            const select = document.getElementById('networkSelect');
+            select.innerHTML = '';
+
+            // Populate dropdown with networks
+            data.networks.forEach(network => {
+                const option = document.createElement('option');
+                option.value = network;
+                // Shorter format: just capitalize the network name
+                option.textContent = network.charAt(0).toUpperCase() + network.slice(1);
+                if (network === '9gag') {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            // Update placeholder for default selection
+            updatePathPlaceholder();
+
+            console.log(`Successfully loaded ${data.total} networks`);
+        } catch (error) {
+            console.error('Error loading networks:', error);
+            const select = document.getElementById('networkSelect');
+            select.innerHTML = `
+                    <option value="9gag" selected>9gag</option>
+                    <option value="reddit">Reddit</option>
+                    <option value="twitter">Twitter</option>
+                    <option value="instagram">Instagram</option>
+                    <option value="facebook">Facebook</option>
+                `;
+        }
+    }
+
+    // Load networks when page loads
+    window.addEventListener('load', loadNetworks);
 
     async function searchMemes() {
         const network = document.getElementById('networkSelect').value;
@@ -192,6 +278,13 @@
             }
 
             const data = await response.json();
+            console.log('API Response:', data);
+
+            // Check if the response has the expected structure
+            if (!data.scraped_data || !data.scraped_data.items) {
+                throw new Error('Invalid response structure');
+            }
+
             allMemes = data.scraped_data.items;
             displayMemes(allMemes);
         } catch (error) {
@@ -217,11 +310,25 @@
 
         memes.forEach((item, index) => {
             const meme = item.original_item;
-            const sentiment = item.sentiment;
+
+            // Validate that meme has required properties
+            if (!meme || !meme.media || !meme.media.length) {
+                console.warn('Skipping invalid item:', item);
+                return;
+            }
+
+            const sentiment = item.sentiment || 0;
             const sentimentClass = sentiment > 0 ? 'sentiment-positive' : sentiment < 0 ? 'sentiment-negative' : 'sentiment-neutral';
             const sentimentText = sentiment > 0 ? 'Positive' : sentiment < 0 ? 'Negative' : 'Neutral';
 
             const media = meme.media[0];
+
+            // Validate media URL exists
+            if (!media || !media.url) {
+                console.warn('Skipping item with no media URL:', meme);
+                return;
+            }
+
             const isVideo = media.url.includes('.mp4');
 
             // Generate keywords HTML
